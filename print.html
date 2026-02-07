@@ -24,7 +24,7 @@
             color: #b00020;
         }
 
-        /* Print layout, copied from your Java method’s HTML */
+        /* Print layout */
         @page {
             size: letter landscape;
             margin: 0;
@@ -36,35 +36,58 @@
         .page {
             width: 11in;
             height: 8.5in;
+
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
             position: relative;
+
+            /* Page-break control */
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-after: always;
             break-after: page;
         }
         .page:last-child {
+            page-break-after: auto;
             break-after: auto;
         }
         .meta {
             position: absolute;
-            top: 50pt;
-            left: 50pt;
-            font-size: 20pt;
+            top: 40pt;
+            left: 40pt;
+            font-size: 18pt;
         }
         .header {
-            font-size: 40pt;
+            font-size: 32pt;
             font-weight: bold;
             margin-bottom: 20pt;
         }
-        .number {
-            font-size: 300pt;
+
+        /* Base number style + size variants
+           (smaller than before so the whole page fits) */
+        .number-base {
             font-weight: bold;
             line-height: 1;
+            word-wrap: break-word;
+            max-width: 90%;
+        }
+        .number-big {
+            font-size: 250pt;
+        }
+        .number-medium {
+            font-size: 140pt;
+        }
+        .number-small {
+            font-size: 100pt;
+        }
+        .number-xsmall {
+            font-size: 72pt;
         }
 
-        /* Hide the form when actually printing */
+        /* Hide the form when printing */
         @media print {
             #form-container {
                 display: none;
@@ -77,7 +100,14 @@
 <div id="form-container">
     <h2>Print for Boxes</h2>
 
-    <textarea id="numbers" placeholder="Example: RERR4315 REDD300 4001"></textarea>
+    <textarea id="numbers" placeholder="One route per line, e.g:
+RERR4300
+rerr4999
+redd300
+redd999
+No Scan
+Already Scan data
+Fun with Text Generation"></textarea>
     <br>
     <button id="generate">Generate & Preview</button>
     <button id="print" disabled>Print</button>
@@ -85,46 +115,67 @@
     <div id="error"></div>
 </div>
 
-<!-- Container where the “pages” will be injected -->
 <div id="pages-container"></div>
 
 <script>
     function formatDateMMMdd(date) {
-        // Similar to java.time.format.DateTimeFormatter.ofPattern("MMM dd")
         const options = { month: 'short', day: '2-digit' };
-        // e.g. "Feb 06"
         return date.toLocaleDateString('en-US', options);
     }
 
+    // Decide font size based on length, only for non-prefixed text
+    function pickNumberSizeClass(text, wasPrefixed) {
+        if (wasPrefixed) {
+            return "number-big"; // RERR/REDD stay big
+        }
+
+        const len = text.length;
+        if (len <= 8) {
+            return "number-big";
+        } else if (len <= 16) {
+            return "number-medium";
+        } else if (len <= 32) {
+            return "number-small";
+        } else {
+            return "number-xsmall";
+        }
+    }
+
     function generatePagesHtml(numberInput) {
-        const inputNumbers = numberInput
-            .split(/[\s,]+/)
+        // Split by lines: each non-empty line becomes a separate page
+        const lines = numberInput
+            .split(/\r?\n/)
             .map(s => s.trim())
             .filter(s => s.length > 0);
 
-        if (inputNumbers.length === 0) {
-            throw new Error("Please enter at least one number.");
+        if (lines.length === 0) {
+            throw new Error("Please enter at least one line.");
         }
 
         const currentDate = formatDateMMMdd(new Date());
         let pageIndex = 1;
-        const totalPages = inputNumbers.length;
+        const totalPages = lines.length;
 
         let html = "";
 
-        for (const raw of inputNumbers) {
-            let number = raw;
+        for (const rawLine of lines) {
+            let number = rawLine;
+            let wasPrefixed = false;
 
             if (number.startsWith("RERR") || number.startsWith("rerr")) {
                 number = number.substring(4);
+                wasPrefixed = true;
             } else if (number.startsWith("REDD") || number.startsWith("redd")) {
                 number = number.substring(3).toUpperCase();
+                wasPrefixed = true;
             }
+
+            const sizeClass = pickNumberSizeClass(number, wasPrefixed);
 
             html += `
                 <div class="page">
                     <div class="header">${currentDate}</div>
-                    <div class="number">${number}</div>
+                    <div class="number-base ${sizeClass}">${number}</div>
                     <div class="meta">Route ${pageIndex} / ${totalPages}</div>
                 </div>
             `;
@@ -152,7 +203,6 @@
             pagesContainer.innerHTML = pagesHtml;
             printBtn.disabled = false;
             document.body.classList.add("print-mode");
-            // Scroll down so you can see the first page preview
             pagesContainer.scrollIntoView({ behavior: "smooth" });
         } catch (err) {
             errorDiv.textContent = err.message || "Invalid input";
