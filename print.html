@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Print for Boxes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            font-size: 16px;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 16px;
+            font-size: 16px;
+        }
+        #error {
+            margin-top: 10px;
+            color: #b00020;
+        }
+
+        /* Print layout, copied from your Java method’s HTML */
+        @page {
+            size: letter landscape;
+            margin: 0;
+        }
+        body.print-mode {
+            margin: 0;
+            padding: 0;
+        }
+        .page {
+            width: 11in;
+            height: 8.5in;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            break-after: page;
+        }
+        .page:last-child {
+            break-after: auto;
+        }
+        .meta {
+            position: absolute;
+            top: 50pt;
+            left: 50pt;
+            font-size: 20pt;
+        }
+        .header {
+            font-size: 40pt;
+            font-weight: bold;
+            margin-bottom: 20pt;
+        }
+        .number {
+            font-size: 300pt;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        /* Hide the form when actually printing */
+        @media print {
+            #form-container {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="form-container">
+    <h2>Print for Boxes</h2>
+
+    <textarea id="numbers" placeholder="Example: RERR4315 REDD300 4001"></textarea>
+    <br>
+    <button id="generate">Generate & Preview</button>
+    <button id="print" disabled>Print</button>
+
+    <div id="error"></div>
+</div>
+
+<!-- Container where the “pages” will be injected -->
+<div id="pages-container"></div>
+
+<script>
+    function formatDateMMMdd(date) {
+        // Similar to java.time.format.DateTimeFormatter.ofPattern("MMM dd")
+        const options = { month: 'short', day: '2-digit' };
+        // e.g. "Feb 06"
+        return date.toLocaleDateString('en-US', options);
+    }
+
+    function generatePagesHtml(numberInput) {
+        const inputNumbers = numberInput
+            .split(/[\s,]+/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+        if (inputNumbers.length === 0) {
+            throw new Error("Please enter at least one number.");
+        }
+
+        const currentDate = formatDateMMMdd(new Date());
+        let pageIndex = 1;
+        const totalPages = inputNumbers.length;
+
+        let html = "";
+
+        for (const raw of inputNumbers) {
+            let number = raw;
+
+            if (number.startsWith("RERR") || number.startsWith("rerr")) {
+                number = number.substring(4);
+            } else if (number.startsWith("REDD") || number.startsWith("redd")) {
+                number = number.substring(3).toUpperCase();
+            }
+
+            html += `
+                <div class="page">
+                    <div class="header">${currentDate}</div>
+                    <div class="number">${number}</div>
+                    <div class="meta">Route ${pageIndex} / ${totalPages}</div>
+                </div>
+            `;
+            pageIndex++;
+        }
+
+        return html;
+    }
+
+    const textarea = document.getElementById("numbers");
+    const errorDiv = document.getElementById("error");
+    const generateBtn = document.getElementById("generate");
+    const printBtn = document.getElementById("print");
+    const pagesContainer = document.getElementById("pages-container");
+
+    generateBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        errorDiv.textContent = "";
+        pagesContainer.innerHTML = "";
+
+        const input = textarea.value;
+
+        try {
+            const pagesHtml = generatePagesHtml(input);
+            pagesContainer.innerHTML = pagesHtml;
+            printBtn.disabled = false;
+            document.body.classList.add("print-mode");
+            // Scroll down so you can see the first page preview
+            pagesContainer.scrollIntoView({ behavior: "smooth" });
+        } catch (err) {
+            errorDiv.textContent = err.message || "Invalid input";
+            printBtn.disabled = true;
+            document.body.classList.remove("print-mode");
+        }
+    });
+
+    printBtn.addEventListener("click", function () {
+        window.print();
+    });
+</script>
+
+</body>
+</html>
